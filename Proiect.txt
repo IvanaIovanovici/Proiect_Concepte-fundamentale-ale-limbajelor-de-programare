@@ -1,0 +1,135 @@
+using System;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading.Tasks; 
+using System.Diagnostics;
+using System.Threading;
+
+namespace GeneratorParoleMD5
+{
+    class Program
+    {
+        private static readonly string Alfabet = "abcdefghijklmnopqrstuvwxyz";
+        private static readonly int LungimeParola = 4;
+
+        static void Main(string[] args)
+        {
+            string[] hashUri = {
+                "56aed7e7485ff03d5605b885b86e947e",
+                "e26026b73cdc3b59012c318ba26b5518",
+                "9de37a0627c25684fdd519ca84073e34"
+            };
+
+            // ETAPA 1: Rezolvarea prin metoda clasica (accent pe HASH)
+            RulareEtapaSecventiala(hashUri);
+
+            Console.WriteLine("\n\nAPASATI O TASTA PENTRU A TRECE LA ETAPA 2 (FIRE DE EXECUTIE)...\n");
+            Console.ReadKey();
+
+            // ETAPA 2: Rezolvarea prin metoda optimizata (accent pe FIRE DE EXECUTIE)
+            RulareEtapaParalela(hashUri);
+
+            Console.WriteLine("\n==================================================");
+            Console.WriteLine("   PROIECT FINALIZAT");
+            Console.WriteLine("==================================================");
+            Console.ReadKey();
+        }
+
+        // --- ETAPA 1: LOGICA PENTRU CERINTA 1 (HASHING) ---
+        private static void RulareEtapaSecventiala(string[] hashUri)
+        {
+            Console.WriteLine("==================================================");
+            Console.WriteLine("   ETAPA 1: DECRIPTARE CLASICA (SINGLE-THREAD)   ");
+            Console.WriteLine("==================================================");
+
+            foreach (var hash in hashUri)
+            {
+                Console.WriteLine("[*] Analiza Hash: " + hash);
+                Stopwatch sw = Stopwatch.StartNew();
+                
+                // Cautare pe un singur fir
+                string rezultat = BacktrackingClasic(new char[LungimeParola], 0, hash);
+                
+                sw.Stop();
+                Console.WriteLine("[OK] Gasit: " + rezultat + " | Timp: " + sw.ElapsedMilliseconds + " ms\n");
+            }
+        }
+
+        // --- ETAPA 2: LOGICA PENTRU CERINTA 2 (FIRE DE EXECUTIE) ---
+        private static void RulareEtapaParalela(string[] hashUri)
+        {
+            Console.WriteLine("==================================================");
+            Console.WriteLine("   ETAPA 2: DECRIPTARE OPTIMIZATA (MULTITHREADING)");
+            Console.WriteLine("==================================================");
+
+            foreach (var hash in hashUri)
+            {
+                Console.WriteLine("[*] Analiza Hash: " + hash);
+                Stopwatch sw = Stopwatch.StartNew();
+
+                // Cautare folosind mai multe fire de executie
+                string rezultat = DecripteazaCuMaiMulteFire(hash);
+
+                sw.Stop();
+                Console.WriteLine("[OK] Gasit: " + rezultat + " | Timp: " + sw.ElapsedMilliseconds + " ms\n");
+            }
+        }
+
+        // METODA PENTRU CERINTA 2: Administrare fire de executie
+        private static string DecripteazaCuMaiMulteFire(string hashTinta)
+        {
+            string rezultatFinal = null;
+
+            // Parallel.ForEach creeaza fire de executie pentru fiecare nucleu al procesorului
+            Parallel.ForEach(Alfabet, (litera, stare) =>
+            {
+                char[] vector = new char[LungimeParola];
+                vector[0] = litera;
+                
+                // Fiecare fir de executie are propriul ID
+                int idFir = Thread.CurrentThread.ManagedThreadId;
+
+                string gasit = BacktrackingClasic(vector, 1, hashTinta);
+                if (gasit != null)
+                {
+                    rezultatFinal = gasit;
+                    Console.WriteLine("    [INFO] Firul de executie ID " + idFir + " a terminat sarcina.");
+                    stare.Stop();
+                }
+            });
+
+            return rezultatFinal;
+        }
+
+        // METODA PENTRU CERINTA 1: Algoritmul Backtracking de baza
+        private static string BacktrackingClasic(char[] parola, int k, string hashTinta)
+        {
+            if (k == LungimeParola)
+            {
+                string textClar = new string(parola);
+                if (CalculMD5(textClar) == hashTinta) return textClar;
+                return null;
+            }
+
+            for (int i = 0; i < Alfabet.Length; i++)
+            {
+                parola[k] = Alfabet[i];
+                string gasit = BacktrackingClasic(parola, k + 1, hashTinta);
+                if (gasit != null) return gasit;
+            }
+            return null;
+        }
+
+        // Functia de hashing MD5
+        private static string CalculMD5(string input)
+        {
+            using (MD5 md5 = MD5.Create())
+            {
+                byte[] bytes = md5.ComputeHash(Encoding.ASCII.GetBytes(input));
+                StringBuilder sb = new StringBuilder();
+                foreach (byte b in bytes) sb.Append(b.ToString("x2"));
+                return sb.ToString();
+            }
+        }
+    }
+}
